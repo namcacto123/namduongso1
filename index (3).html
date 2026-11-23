@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trợ lý Nam Béo</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      touch-action: none;     /* để kéo trên điện thoại không bị cuộn trang */
+      user-select: none;
+      cursor: grab;
+      background: #02030a;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    /* Tinh vân màu tím, xanh phía sau các ngôi sao */
+    .tinh-van {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 30%, rgba(120, 60, 200, 0.35), transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(30, 100, 220, 0.30), transparent 55%),
+        radial-gradient(ellipse at 60% 20%, rgba(220, 70, 140, 0.18), transparent 45%),
+        radial-gradient(ellipse at center, #0a0f2c 0%, #02030a 80%);
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+    }
+
+    .khung {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 9vh;
+      pointer-events: none;   /* để bấm xuyên qua chữ */
+    }
+
+    #loi-chao {
+      color: #fff;
+      font-size: 2.2rem;
+      text-align: center;
+      padding: 0 20px;
+      text-shadow: 0 0 10px #8ab4ff, 0 0 30px #5b7cff, 0 0 60px #5b7cff;
+      border-right: 3px solid #fff;      /* con trỏ nhấp nháy */
+      animation: nhay 0.8s infinite;
+    }
+
+    @keyframes nhay {
+      50% { border-color: transparent; }
+    }
+
+    #goi-y {
+      position: fixed;
+      bottom: 14px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 0.85rem;
+      z-index: 1;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="tinh-van"></div>
+  <canvas id="vu-tru"></canvas>
+
+  <div class="khung">
+    <div id="loi-chao"></div>
+  </div>
+  <div id="goi-y">Bấm giữ và kéo trái / phải để xoay tùy ý, thả tay ra sẽ tự xoay tiếp</div>
+
+  <script>
+    // ===== Lời chào gõ chữ =====
+    // Đổi câu chào ở đây
+    const cauChao = "Xin Chào Bạn, chào mừng bạn đã đến với trang web của mình";
+    // Tốc độ gõ (mili giây cho mỗi chữ), số càng nhỏ gõ càng nhanh
+    const tocDo = 80;
+
+    const o = document.getElementById("loi-chao");
+    let i = 0;
+
+    function go() {
+      if (i < cauChao.length) {
+        o.textContent += cauChao.charAt(i);
+        i++;
+        setTimeout(go, tocDo);
+      }
+    }
+    window.addEventListener("load", go);
+
+    // ===== Nền vũ trụ =====
+    const canvas = document.getElementById("vu-tru");
+    const ctx = canvas.getContext("2d");
+    let w, h, saoList = [], saoBang = [];
+
+    // Số lượng ngôi sao (tăng/giảm tùy thích)
+    const SO_SAO = 220;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+      saoList = Array.from({ length: SO_SAO }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.5 + 0.3,
+        pha: Math.random() * Math.PI * 2,
+        nhay: Math.random() * 0.03 + 0.01,
+        troi: Math.random() * 0.15 + 0.02
+      }));
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    function taoSaoBang() {
+      saoBang.push({
+        x: Math.random() * w * 0.8 + w * 0.2,
+        y: Math.random() * h * 0.4,
+        vx: -(Math.random() * 6 + 6),
+        vy: Math.random() * 3 + 3,
+        doDai: Math.random() * 80 + 60,
+        song: 1
+      });
+    }
+    // Cứ vài giây lại có một sao băng
+    setInterval(() => { if (Math.random() < 0.7) taoSaoBang(); }, 2500);
+
+    // ===== Hệ Mặt Trời =====
+    // ban: bán kính quỹ đạo (tỉ lệ), co: cỡ hành tinh, tocDo: tốc độ quay
+    // Muốn thêm/bớt hành tinh thì sửa danh sách này
+    const hanhTinh = [
+      { ten: "Thủy",       ban: 0.14, co: 3.5, tocDo: 0.030, mau: ["#d9d4cf", "#7d7873"], goc: 0.5 },
+      { ten: "Kim",        ban: 0.22, co: 5,   tocDo: 0.022, mau: ["#ffe2a8", "#c28b3c"], goc: 2.0 },
+      { ten: "Trái Đất",   ban: 0.30, co: 5.5, tocDo: 0.017, mau: ["#7fc4ff", "#1c4fa0"], goc: 4.0, matTrang: true },
+      { ten: "Hỏa",        ban: 0.38, co: 4.5, tocDo: 0.013, mau: ["#ff9b6a", "#a63a1a"], goc: 1.0 },
+      { ten: "Mộc",        ban: 0.52, co: 11,  tocDo: 0.008, mau: ["#f3d9b5", "#b47a4a"], goc: 3.2, soc: true },
+      { ten: "Thổ",        ban: 0.66, co: 9,   tocDo: 0.006, mau: ["#f7e3a6", "#b99a4a"], goc: 5.5, vanh: true },
+      { ten: "Thiên Vương",ban: 0.80, co: 7,   tocDo: 0.0045,mau: ["#bff6ff", "#4fa9b8"], goc: 0.2 },
+      { ten: "Hải Vương",  ban: 0.94, co: 7,   tocDo: 0.0035,mau: ["#7ea2ff", "#2a3ea8"], goc: 2.8 }
+    ];
+
+    let thoiGian = 0;       // "đồng hồ" của hệ Mặt Trời, tăng thì hành tinh quay tới
+    let dangKeo = false;    // đang bấm giữ hay không
+    let diemCu = 0;         // vị trí ngang lần trước của chuột/ngón tay
+    let vanToc = 0;         // tốc độ kéo gần nhất
+    let quanTinh = 0;       // đà quay sau khi thả tay, giảm dần về 0
+
+    // Độ nhạy khi kéo: số lớn thì kéo một chút quay nhiều
+    const DO_NHAY = 0.6;
+
+    window.addEventListener("pointerdown", (e) => {
+      dangKeo = true;
+      diemCu = e.clientX;
+      quanTinh = 0;
+      vanToc = 0;
+      document.body.style.cursor = "grabbing";
+    });
+
+    window.addEventListener("pointermove", (e) => {
+      if (!dangKeo) return;
+      const dx = e.clientX - diemCu;
+      diemCu = e.clientX;
+      vanToc = dx * DO_NHAY;
+      thoiGian += vanToc;   // kéo sang phải quay tới, kéo sang trái quay lui
+    });
+
+    function thaTay() {
+      if (!dangKeo) return;
+      dangKeo = false;
+      quanTinh = vanToc;    // giữ lại đà, rồi giảm dần và quay tự động tiếp
+      document.body.style.cursor = "grab";
+    }
+    window.addEventListener("pointerup", thaTay);
+    window.addEventListener("pointercancel", thaTay);
+    window.addEventListener("blur", thaTay);
+
+    function veHanhTinh(p, x, y, r) {
+      // thân hành tinh (hình cầu có bóng)
+      const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
+      g.addColorStop(0, p.mau[0]);
+      g.addColorStop(1, p.mau[1]);
+
+      // vành đai sao Thổ (nửa sau)
+      if (p.vanh) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(230,205,150,0.7)";
+        ctx.lineWidth = Math.max(1.5, r * 0.25);
+        ctx.beginPath();
+        ctx.ellipse(x, y, r * 1.9, r * 0.55, -0.35, Math.PI, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      // sọc trên sao Mộc
+      if (p.soc) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = "rgba(150,90,50,0.35)";
+        ctx.fillRect(x - r, y - r * 0.35, r * 2, r * 0.2);
+        ctx.fillRect(x - r, y + r * 0.15, r * 2, r * 0.25);
+        ctx.restore();
+      }
+
+      // vành đai sao Thổ (nửa trước)
+      if (p.vanh) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(240,215,160,0.9)";
+        ctx.lineWidth = Math.max(1.5, r * 0.25);
+        ctx.beginPath();
+        ctx.ellipse(x, y, r * 1.9, r * 0.55, -0.35, 0, Math.PI);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function veHeMatTroi() {
+      const tamX = w / 2;
+      const tamY = h * 0.62;
+      const banMax = Math.min(w * 0.46, h * 0.5 / 0.34);
+      const tiLe = 0.34;                          // độ dẹt của quỹ đạo
+      const phongTo = Math.min(1, w / 900) * 0.6 + 0.5;
+
+      // quỹ đạo
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(255,255,255,0.10)";
+      for (const p of hanhTinh) {
+        ctx.beginPath();
+        ctx.ellipse(tamX, tamY, banMax * p.ban, banMax * p.ban * tiLe, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // tính vị trí từng hành tinh
+      const ds = hanhTinh.map(p => {
+        const a = p.goc + thoiGian * p.tocDo;
+        const s = Math.sin(a);
+        return {
+          p,
+          x: tamX + Math.cos(a) * banMax * p.ban,
+          y: tamY + s * banMax * p.ban * tiLe,
+          sau: s < 0,
+          r: p.co * phongTo * (1 + s * 0.15)
+        };
+      });
+
+      const veNhom = (nhom) => {
+        for (const d of nhom) {
+          veHanhTinh(d.p, d.x, d.y, d.r);
+          // mặt trăng của Trái Đất
+          if (d.p.matTrang) {
+            const am = thoiGian * 0.08;
+            ctx.beginPath();
+            ctx.arc(d.x + Math.cos(am) * d.r * 2.2, d.y + Math.sin(am) * d.r * 0.8, d.r * 0.28, 0, Math.PI * 2);
+            ctx.fillStyle = "#e8e8e8";
+            ctx.fill();
+          }
+          // tên hành tinh
+          ctx.fillStyle = "rgba(255,255,255,0.6)";
+          ctx.font = "11px 'Segoe UI', Arial, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(d.p.ten, d.x, d.y + d.r + 14);
+        }
+      };
+
+      // hành tinh ở phía sau Mặt Trời
+      veNhom(ds.filter(d => d.sau));
+
+      // Mặt Trời
+      const rSun = 26 * phongTo;
+      const glow = ctx.createRadialGradient(tamX, tamY, rSun * 0.3, tamX, tamY, rSun * 3.2);
+      glow.addColorStop(0, "rgba(255,200,80,0.55)");
+      glow.addColorStop(1, "rgba(255,140,0,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(tamX, tamY, rSun * 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      const sun = ctx.createRadialGradient(tamX - rSun * 0.3, tamY - rSun * 0.3, rSun * 0.1, tamX, tamY, rSun);
+      sun.addColorStop(0, "#fff7c2");
+      sun.addColorStop(0.5, "#ffc844");
+      sun.addColorStop(1, "#ff8a00");
+      ctx.beginPath();
+      ctx.arc(tamX, tamY, rSun, 0, Math.PI * 2);
+      ctx.fillStyle = sun;
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = "12px 'Segoe UI', Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Mặt Trời", tamX, tamY + rSun + 16);
+
+      // hành tinh ở phía trước Mặt Trời
+      veNhom(ds.filter(d => !d.sau));
+    }
+
+    function ve() {
+      ctx.clearRect(0, 0, w, h);
+
+      // Sao nhấp nháy và trôi nhẹ
+      for (const s of saoList) {
+        s.pha += s.nhay;
+        s.y += s.troi;
+        if (s.y > h) { s.y = 0; s.x = Math.random() * w; }
+        const sang = 0.5 + 0.5 * Math.sin(s.pha);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255," + (0.3 + 0.7 * sang) + ")";
+        ctx.fill();
+      }
+
+      // Sao băng
+      for (let k = saoBang.length - 1; k >= 0; k--) {
+        const b = saoBang[k];
+        const dai = Math.hypot(b.vx, b.vy);
+        const duoiX = b.x - (b.vx / dai) * b.doDai;
+        const duoiY = b.y - (b.vy / dai) * b.doDai;
+        const g = ctx.createLinearGradient(b.x, b.y, duoiX, duoiY);
+        g.addColorStop(0, "rgba(255,255,255," + b.song + ")");
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(duoiX, duoiY);
+        ctx.stroke();
+
+        b.x += b.vx;
+        b.y += b.vy;
+        b.song -= 0.012;
+        if (b.song <= 0 || b.x < -100 || b.y > h + 100) saoBang.splice(k, 1);
+      }
+
+      // Hệ Mặt Trời: tự quay khi không bấm giữ, thả tay ra thì còn đà rồi quay đều lại
+      if (!dangKeo) {
+        thoiGian += 1 + quanTinh;
+        quanTinh *= 0.95;
+      }
+      veHeMatTroi();
+
+      requestAnimationFrame(ve);
+    }
+    ve();
+  </script>
+</body>
+</html>
